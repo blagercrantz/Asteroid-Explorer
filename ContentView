@@ -1,0 +1,267 @@
+import SwiftUI
+
+struct ContentView: View {
+    @State var star = Planet(mass: 1000, velocityX: 0, velocityY: 0, x: 0, y: 0)
+    @State var mars = Planet(mass: 3, velocityX: 0, velocityY: 3.5355, x: 80, y: 0)
+    @State var jupiter = Planet(mass: 6, velocityX: 0, velocityY: -2.7735, x: -130, y: 0)
+    @State var needle = Rocket(mass: 0.2, velocityX: 0, velocityY: 0, x: 0, y: -300, angle: 0, thrustAngle: .pi / 3, angularVelocity: 0, expelledMass: 0)
+    @State var hasTakenTreasure = false
+    @State var initialAngle: Double = 0
+    @State var steeringOffset = CGSize.zero
+    @State var success = false
+    @State var speedOfTime = 0.125
+    let timer = Timer.publish(every: 0.125, on: .main, in: .common).autoconnect()
+    var body: some View {
+        ZStack {
+            Rectangle()
+                .fill(Color("Black"))
+                .ignoresSafeArea(.all)
+                .statusBarHidden(true)
+            VStack {
+                HStack {
+                    ZStack {
+                        Rectangle()
+                            .fill(Color("Black"))
+                            .stroke(Color(success ? "DarkYellow" : "Yellow"), lineWidth: 3.6)
+                            .frame(width: 70, height: 30)
+                        HStack(spacing: 3.6) {
+                            Rectangle()
+                                .fill(Color(success ? "DarkYellow" : "Yellow"))
+                                .frame(width: 12.1, height: 19.2)
+                                .opacity((needle.mass - 0.05) / 0.15 >= 0 ? 1 : 0)
+                            Rectangle()
+                                .fill(Color(success ? "DarkYellow" : "Yellow"))
+                                .frame(width: 12.1, height: 19.2)
+                                .opacity((needle.mass - 0.05) / 0.15 >= 0.25 ? 1 : 0)
+                            Rectangle()
+                                .fill(Color(success ? "DarkYellow" : "Yellow"))
+                                .frame(width: 12.1, height: 19.2)
+                                .opacity((needle.mass - 0.05) / 0.15 >= 0.5 ? 1 : 0)
+                            Rectangle()
+                                .fill(Color(success ? "DarkYellow" : "Yellow"))
+                                .frame(width: 12.1, height: 19.2)
+                                .opacity((needle.mass - 0.05) / 0.15 >= 0.75 ? 1 : 0)
+                            
+                        }
+                        
+                    }
+                    .padding(.horizontal, 36)
+                    Spacer()
+                    Text("\(calculateDistance(x1: needle.x, x2: star.x, y1: needle.y, y2: star.y), specifier: "%.0f")")
+                        .font(.custom("ArcadeNormal", size: 27))
+                        .foregroundStyle(Color(success ? "DarkYellow" : "Yellow"))
+                        .padding(.horizontal, 36)
+                        .onTapGesture {
+                            if !success {
+                                resetNeedle()
+                            }
+                        }
+                }
+                ZStack {
+                    Rectangle()
+                        .fill(Color("Black"))
+                        .frame(width: 370, height: 500)
+                    Rectangle()
+                        .foregroundColor(Color(success ? "DarkYellow" : "Yellow"))
+                        .frame(width: 3.6, height: 3.6)
+                        .offset(x: 0, y: -52)
+                        .opacity(hasTakenTreasure ? 0 : 1)
+                    Triangle()
+                        .foregroundColor(Color(success ? "DarkYellow" : "Yellow"))
+                        .frame(width: 3.6, height: 11)
+                        .rotationEffect(Angle(radians: needle.angle))
+                        .offset(x: needle.x, y: -100 - needle.y)
+                        .onReceive(timer) { _ in
+                            if needle.mass > 0.05 {
+                                needle.mass -= needle.expelledMass
+                            }
+                            let starAcceleration = calculateAcceleration(x1: needle.x, x2: star.x, y1: needle.y, y2: star.y, mass: star.mass)
+                            let marsAcceleration = calculateAcceleration(x1: needle.x, x2: mars.x, y1: needle.y, y2: mars.y, mass: mars.mass)
+                            let jupiterAcceleration = calculateAcceleration(x1: needle.x, x2: jupiter.x, y1: needle.y, y2: jupiter.y, mass: jupiter.mass)
+                            let thrustAcceleration = needle.mass > 0.05 ? calculateThrustAcceleration(angle: needle.angle, thrustAngle: needle.thrustAngle, mass: needle.mass, expelledMass: needle.expelledMass) : (x: 0, y: 0, rotation: 0)
+                            
+                            if !success {
+                                needle.velocityX += starAcceleration.x + marsAcceleration.x + jupiterAcceleration.x + thrustAcceleration.x
+                                needle.velocityY += starAcceleration.y + marsAcceleration.y + jupiterAcceleration.y + thrustAcceleration.y
+                                needle.angularVelocity += thrustAcceleration.rotation
+                            }
+                            needle.x += needle.velocityX
+                            needle.y += needle.velocityY
+                            needle.angle += needle.angularVelocity
+                            
+                            let distanceToStar = calculateDistance(x1: needle.x, x2: star.x, y1: needle.y, y2: star.y)
+                            let distanceToMars = calculateDistance(x1: needle.x, x2: mars.x, y1: needle.y, y2: mars.y)
+                            let distanceToJupiter = calculateDistance(x1: needle.x, x2: jupiter.x, y1: needle.y, y2: jupiter.y)
+                            let distanceToTreasure = calculateDistance(x1: needle.x, x2: 0, y1: needle.y, y2: -50)
+                            if distanceToStar < 39 || distanceToMars < 14 || distanceToJupiter < 16.5 || distanceToStar > 999 {
+                                if !success {
+                                    resetNeedle()
+                                }
+                            }
+                            if distanceToTreasure < 7 {
+                                hasTakenTreasure = true
+                            }
+                            if hasTakenTreasure && needle.y > 250 {
+                                success = true
+                            }
+                        }
+                    Circle()
+                        .foregroundColor(Color(success ? "DarkYellow" : "Yellow"))
+                        .frame(width: 70, height: 70)
+                        .offset(x: star.x , y: -100 - star.y)
+                    Circle()
+                        .foregroundColor(Color(success ? "DarkYellow" : "Yellow"))
+                        .frame(width: 20, height: 20)
+                        .offset(x: mars.x , y: -100 - mars.y)
+                        .onReceive(timer) { _ in
+                            let starAcceleration = calculateAcceleration(x1: mars.x, x2: star.x, y1: mars.y, y2: star.y, mass: star.mass)
+                            let jupiterAcceleration = calculateAcceleration(x1: mars.x, x2: jupiter.x, y1: mars.y, y2: jupiter.y, mass: jupiter.mass)
+                            mars.velocityX += starAcceleration.x + jupiterAcceleration.x
+                            mars.velocityY += starAcceleration.y + jupiterAcceleration.y
+                            mars.x += mars.velocityX
+                            mars.y += mars.velocityY
+                        }
+                    Circle()
+                        .foregroundColor(Color(success ? "DarkYellow" : "Yellow"))
+                        .frame(width: 25, height: 25)
+                        .offset(x: jupiter.x , y: -100 - jupiter.y)
+                        .onReceive(timer) { _ in
+                            let starAcceleration = calculateAcceleration(x1: jupiter.x, x2: star.x, y1: jupiter.y, y2: star.y, mass: star.mass)
+                            let marsAcceleration = calculateAcceleration(x1: jupiter.x, x2: mars.x, y1: jupiter.y, y2: mars.y, mass: mars.mass)
+                            jupiter.velocityX += starAcceleration.x + marsAcceleration.x
+                            jupiter.velocityY += starAcceleration.y + marsAcceleration.y
+                            jupiter.x += jupiter.velocityX
+                            jupiter.y += jupiter.velocityY
+                        }
+                }
+                .padding(.vertical)
+                ZStack {
+                    V()
+                        .stroke(Color(success ? "DarkYellow" : success ? "DarkYellow" : "Yellow"), lineWidth: 3.6)
+                        .frame(width: 200, height: 150)
+                    Circle()
+                        .foregroundColor(Color(success ? "DarkYellow" : "Yellow"))
+                        .frame(width: 30, height: 30)
+                        .offset(y: -75)
+                        .offset(x: steeringOffset.width, y: steeringOffset.height)
+                        .opacity((needle.mass - 0.05) / 0.15 >= 0 ? 1 : 0)
+                        .gesture(
+                            DragGesture()
+                                .onChanged { gesture in
+                                    if gesture.translation.height >= (gesture.translation.width * 1.5) &&
+                                        gesture.translation.height >= (gesture.translation.width * -1.5) &&
+                                        gesture.translation.height <= 150 {
+                                        steeringOffset.height = gesture.translation.height
+                                        steeringOffset.width = gesture.translation.width
+                                        needle.expelledMass = (gesture.translation.height / 150) * 0.002
+                                        
+                                        let k = steeringOffset.height / -steeringOffset.width
+                                        let angle = atan(k) >= 0 ? atan(k) : atan(k) + .pi
+                                        needle.thrustAngle = angle
+                                        
+                                    } else if gesture.translation.height > 150 && gesture.translation.width < 100 && gesture.translation.width > -100 {
+                                        steeringOffset.height = 150
+                                        steeringOffset.width = gesture.translation.width
+                                        needle.expelledMass = 0.002
+                                    }
+                                }
+                                .onEnded { _ in
+                                    steeringOffset = .zero
+                                    needle.expelledMass = 0
+                                }
+                        )
+                }
+                Spacer()
+            }
+            let string = """
+            YOU WIN!
+            
+            Play again?
+            """
+            Text(string)
+                .font(.custom("ArcadeNormal", size: 27))
+                .multilineTextAlignment(.center)
+                .foregroundStyle(Color("Yellow"))
+                .padding(.horizontal, 36)
+                .opacity(success ? 1 : 0)
+                .onTapGesture {
+                    success = false
+                    resetNeedle()
+                }
+        }
+    }
+    func calculateAcceleration(x1: Double, x2: Double, y1: Double, y2: Double, mass: Double) -> (x: Double, y: Double) {
+        let distance = calculateDistance(x1: x1, x2: x2, y1: y1, y2: y2)
+        let acceleration = mass / (distance * distance)
+        let k = (y2 - y1) / (x2 - x1)
+        var angle = atan(k)
+        if x1 < x2 {
+            angle += .pi
+        }
+        return (x: -acceleration * cos(angle), y: -acceleration * sin(angle))
+    }
+    func calculateThrustAcceleration(angle: Double, thrustAngle: Double, mass: Double, expelledMass: Double) -> (x: Double, y: Double, rotation: Double) {
+        let netAcceleration = (expelledMass * 12.5) / mass
+        let forwardAcceleration = sin(thrustAngle) * netAcceleration
+        let appliedForce = -cos(thrustAngle) * expelledMass * 12.5
+        let torque = appliedForce * 5.5
+        let momentOfInertia = mass * (10.0833)
+        let angularAcceleration = torque / momentOfInertia
+        return (x: sin(angle) * forwardAcceleration, y: cos(angle) * forwardAcceleration, rotation: angularAcceleration)
+    }
+    func calculateDistance(x1: Double, x2: Double, y1: Double, y2: Double) -> Double {
+        let distanceXSqrd = (x2 - x1) * (x2 - x1)
+        let distanceYSqrd = (y2 - y1) * (y2 - y1)
+        return sqrt(distanceXSqrd + distanceYSqrd)
+    }
+    func resetNeedle() {
+        needle.x = 0
+        needle.y = -300
+        needle.velocityX = 0
+        needle.velocityY = 0
+        needle.mass = 0.2
+        needle.angle = 0
+        needle.angularVelocity = 0
+        hasTakenTreasure = false
+    }
+}
+
+struct Planet {
+    let mass: Double
+    var velocityX: Double
+    var velocityY: Double
+    var x: Double
+    var y: Double
+}
+struct Rocket {
+    var mass: Double
+    var velocityX: Double
+    var velocityY: Double
+    var x: Double
+    var y: Double
+    var angle: Double
+    var thrustAngle: Double
+    var angularVelocity: Double
+    var expelledMass: Double
+}
+struct V: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+        path.move(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        return path
+    }
+}
+struct Triangle: Shape {
+    func path(in rect: CGRect) -> Path {
+        var path = Path()
+
+        path.move(to: CGPoint(x: rect.midX, y: rect.minY))
+        path.addLine(to: CGPoint(x: rect.minX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.maxX, y: rect.maxY))
+        path.addLine(to: CGPoint(x: rect.midX, y: rect.minY))
+
+        return path
+    }
+}
